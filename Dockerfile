@@ -17,7 +17,24 @@ RUN apt-get install -y libboost-dev libboost-filesystem-dev libboost-program-opt
 # Install remaining dependencies
 RUN apt-get install -y subversion git-core tar unzip wget bzip2 build-essential autoconf libtool libxml2-dev libgeos-dev libpq-dev libbz2-dev libprotobuf-c0-dev protobuf-c-compiler libfreetype6-dev libpng12-dev libtiff4-dev libicu-dev libgdal-dev libcairo-dev libcairomm-1.0-dev apache2 apache2-dev libagg-dev liblua5.2-dev ttf-unifont
 
-RUN apt-get install -y autoconf apache2-dev libtool libxml2-dev libbz2-dev libgeos-dev libgeos++-dev libproj-dev gdal-bin libgdal1-dev mapnik-utils python-mapnik libmapnik-dev
+RUN apt-get install -y autoconf apache2-dev libtool libxml2-dev libbz2-dev libgeos-dev libgeos++-dev libproj-dev gdal-bin libgdal1-dev mapnik-utils python-mapnik libmapnik-dev python zlib1g-dev clang make pkg-config curl
+
+RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test
+RUN apt-get update -y
+RUN apt-get install -y gcc-6 g++-6 clang-3.8
+
+ENV CXX="clang++-3.8" && export CC="clang-3.8"
+
+# install mapnik
+RUN cd /tmp && git clone https://github.com/mapnik/mapnik mapnik-3.x --depth 10 \
+ && cd mapnik-3.x \
+&& git submodule update --init \
+&& source bootstrap.sh
+RUN ./configure CUSTOM_CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" CXX=${CXX} CC=${CC} \
+ && make \
+&& make test \
+&& make install
+RUN ldconfig
 
 # Install osm2pgsql
 RUN cd /tmp && git clone git://github.com/openstreetmap/osm2pgsql.git
@@ -25,15 +42,6 @@ RUN cd /tmp/osm2pgsql && \
     ./autogen.sh && \
     ./configure && \
     make && make install
-
-# Install the Mapnik library
-RUN cd /tmp && git clone git://github.com/mapnik/mapnik
-RUN cd /tmp/mapnik && \
-    git checkout 2.2.x && \
-    python scons/scons.py configure INPUT_PLUGINS=all OPTIMIZATION=3 SYSTEM_FONTS=/usr/share/fonts/truetype/ && \
-    python scons/scons.py && \
-    python scons/scons.py install && \
-    ldconfig
 
 # Verify that Mapnik has been installed correctly
 RUN python -c 'import mapnik'
